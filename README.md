@@ -39,8 +39,8 @@ A modern web application for streaming videos and music with a Netflix-inspired 
 
 1. Clone the repository:
    ```
-   git clone https://github.com/yourusername/video-player-2.git
-   cd video-player-2
+   [git clone https://github.com/yourusername/video-player-2.git
+   cd video-player-2](https://github.com/gichinga03/video-player-2.git)
    ```
 
 2. Create and activate a virtual environment:
