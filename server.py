@@ -9,24 +9,30 @@ import tempfile
 import shutil
 from dotenv import load_dotenv
 import os
+from mutagen import File
+from mutagen.easyid3 import EasyID3
 
 load_dotenv()
 app = Flask(__name__)
 app.secret_key = "BE61D9E9B64AC871D85FD7C285F7D"
 
-# Folder paths for movies and series
+# Folder paths for movies, series, and music
 MOVIE_FOLDER = os.getenv("MOVIE")
 SERIES_FOLDER = os.getenv("SERIES")
+MUSIC_FOLDER = r"C:\Users\gichi\Music"
 
 # Debug information
 print(f"MOVIE_FOLDER: {MOVIE_FOLDER}")
 print(f"SERIES_FOLDER: {SERIES_FOLDER}")
+print(f"MUSIC_FOLDER: {MUSIC_FOLDER}")
 print(f"MOVIE_FOLDER exists: {os.path.exists(MOVIE_FOLDER)}")
 print(f"SERIES_FOLDER exists: {os.path.exists(SERIES_FOLDER)}")
+print(f"MUSIC_FOLDER exists: {os.path.exists(MUSIC_FOLDER)}")
 
 # Set Flask app configuration
 app.config['MOVIE_FOLDER'] = MOVIE_FOLDER
 app.config['SERIES_FOLDER'] = SERIES_FOLDER
+app.config['MUSIC_FOLDER'] = MUSIC_FOLDER
 
 # File to store playback positions
 PLAYBACK_DATA_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "playback_data.json")
@@ -292,6 +298,76 @@ def stream(filepath):
         return response
     except Exception as e:
         print(f"Error streaming file: {str(e)}")
+        return str(e), 500
+
+def get_music_files():
+    music_files = []
+    for root, dirs, files in os.walk(MUSIC_FOLDER):
+        for file in files:
+            if file.lower().endswith(('.mp3', '.wav', '.m4a', '.flac')):
+                file_path = os.path.join(root, file)
+                try:
+                    audio = EasyID3(file_path)
+                    title = audio.get('title', [file])[0]
+                    artist = audio.get('artist', ['Unknown Artist'])[0]
+                except:
+                    title = os.path.splitext(file)[0]
+                    artist = 'Unknown Artist'
+                
+                # Create a relative path for the file
+                rel_path = os.path.relpath(file_path, MUSIC_FOLDER)
+                music_files.append({
+                    'name': title,
+                    'artist': artist,
+                    'path': rel_path,
+                    'filename': file
+                })
+    return music_files
+
+@app.route('/music')
+def music_player():
+    music_files = get_music_files()
+    return render_template('music.html', music_files=music_files)
+
+@app.route('/stream_music/<path:filename>')
+def stream_music(filename):
+    try:
+        # Construct the full file path
+        file_path = os.path.join(MUSIC_FOLDER, filename)
+        
+        # Get the file's mime type
+        mime_type = mimetypes.guess_type(file_path)[0]
+        if mime_type is None:
+            mime_type = 'application/octet-stream'
+        
+        # Stream the file
+        return send_file(
+            file_path,
+            mimetype=mime_type,
+            as_attachment=False
+        )
+    except Exception as e:
+        return str(e), 500
+
+@app.route('/download_music/<path:filename>')
+def download_music(filename):
+    try:
+        # Construct the full file path
+        file_path = os.path.join(MUSIC_FOLDER, filename)
+        
+        # Get the file's mime type
+        mime_type = mimetypes.guess_type(file_path)[0]
+        if mime_type is None:
+            mime_type = 'application/octet-stream'
+        
+        # Send the file as an attachment
+        return send_file(
+            file_path,
+            mimetype=mime_type,
+            as_attachment=True,
+            download_name=os.path.basename(file_path)
+        )
+    except Exception as e:
         return str(e), 500
 
 if __name__ == '__main__':
