@@ -1,4 +1,4 @@
-from flask import Flask, send_file, render_template, request, jsonify, Response, redirect, url_for
+from flask import Flask, send_file, render_template, request, jsonify, Response, redirect, url_for, send_from_directory
 import os
 import mimetypes
 import json
@@ -11,6 +11,10 @@ from dotenv import load_dotenv
 import os
 from mutagen import File
 from mutagen.easyid3 import EasyID3
+import requests
+import hashlib
+from PIL import Image
+from io import BytesIO
 
 load_dotenv()
 app = Flask(__name__)
@@ -20,19 +24,41 @@ app.secret_key = "BE61D9E9B64AC871D85FD7C285F7D"
 MOVIE_FOLDER = os.getenv("MOVIE")
 SERIES_FOLDER = os.getenv("SERIES")
 MUSIC_FOLDER = r"C:\Users\gichi\Music"
+ALBUM_COVERS_FOLDER = os.path.join(os.path.dirname(os.path.abspath(__file__)), "static", "album_covers")
+
+# Create album covers directory if it doesn't exist
+os.makedirs(ALBUM_COVERS_FOLDER, exist_ok=True)
+
+# Create default album cover if it doesn't exist
+default_cover_path = os.path.join(ALBUM_COVERS_FOLDER, "default.jpg")
+if not os.path.exists(default_cover_path):
+    try:
+        # Download a default cover
+        response = requests.get("https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?ixlib=rb-1.2.1&auto=format&fit=crop&w=300&q=80")
+        if response.status_code == 200:
+            # Process and save the image
+            img = Image.open(BytesIO(response.content))
+            img = img.convert('RGB')
+            img.save(default_cover_path, 'JPEG', quality=85)
+            print(f"Created default album cover at {default_cover_path}")
+    except Exception as e:
+        print(f"Error creating default album cover: {e}")
 
 # Debug information
 print(f"MOVIE_FOLDER: {MOVIE_FOLDER}")
 print(f"SERIES_FOLDER: {SERIES_FOLDER}")
 print(f"MUSIC_FOLDER: {MUSIC_FOLDER}")
+print(f"ALBUM_COVERS_FOLDER: {ALBUM_COVERS_FOLDER}")
 print(f"MOVIE_FOLDER exists: {os.path.exists(MOVIE_FOLDER)}")
 print(f"SERIES_FOLDER exists: {os.path.exists(SERIES_FOLDER)}")
 print(f"MUSIC_FOLDER exists: {os.path.exists(MUSIC_FOLDER)}")
+print(f"ALBUM_COVERS_FOLDER exists: {os.path.exists(ALBUM_COVERS_FOLDER)}")
 
 # Set Flask app configuration
 app.config['MOVIE_FOLDER'] = MOVIE_FOLDER
 app.config['SERIES_FOLDER'] = SERIES_FOLDER
 app.config['MUSIC_FOLDER'] = MUSIC_FOLDER
+app.config['ALBUM_COVERS_FOLDER'] = ALBUM_COVERS_FOLDER
 
 # File to store playback positions
 PLAYBACK_DATA_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "playback_data.json")
@@ -300,6 +326,48 @@ def stream(filepath):
         print(f"Error streaming file: {str(e)}")
         return str(e), 500
 
+def get_album_cover(music_file):
+    """Get album cover for a music file, either from metadata or download a default one"""
+    try:
+        # Try to get cover from metadata
+        audio = EasyID3(music_file)
+        if 'APIC:' in audio:
+            cover_data = audio['APIC:'].data
+            # Save the cover
+            cover_hash = hashlib.md5(music_file.encode()).hexdigest()
+            cover_path = os.path.join(ALBUM_COVERS_FOLDER, f"{cover_hash}.jpg")
+            
+            with open(cover_path, 'wb') as f:
+                f.write(cover_data)
+            
+            return f"album_covers/{cover_hash}.jpg"
+    except:
+        pass
+    
+    # If no cover in metadata, use a default cover based on the music file name
+    cover_hash = hashlib.md5(music_file.encode()).hexdigest()
+    cover_path = os.path.join(ALBUM_COVERS_FOLDER, f"{cover_hash}.jpg")
+    
+    # Check if we already have a cover for this file
+    if os.path.exists(cover_path):
+        return f"album_covers/{cover_hash}.jpg"
+    
+    # Download a default cover
+    try:
+        # Use a music-themed image from Unsplash
+        response = requests.get(f"https://source.unsplash.com/random/300x300/?music,album&sig={hash(music_file) % 100}")
+        if response.status_code == 200:
+            # Process and save the image
+            img = Image.open(BytesIO(response.content))
+            img = img.convert('RGB')
+            img.save(cover_path, 'JPEG', quality=85)
+            return f"album_covers/{cover_hash}.jpg"
+    except:
+        pass
+    
+    # If all else fails, return a default cover
+    return "album_covers/default.jpg"
+
 def get_music_files():
     music_files = []
     for root, dirs, files in os.walk(MUSIC_FOLDER):
@@ -316,11 +384,16 @@ def get_music_files():
                 
                 # Create a relative path for the file
                 rel_path = os.path.relpath(file_path, MUSIC_FOLDER)
+                
+                # Get album cover
+                cover_path = get_album_cover(file_path)
+                
                 music_files.append({
                     'name': title,
                     'artist': artist,
                     'path': rel_path,
-                    'filename': file
+                    'filename': file,
+                    'cover': cover_path
                 })
     return music_files
 
