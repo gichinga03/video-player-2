@@ -18,8 +18,7 @@ A modern web application for streaming videos and music with a Netflix-inspired 
 - Spotify-inspired UI with album artwork
 - Music playback with controls
 - Download functionality for offline listening
-- Automatic album artwork extraction from metadata
-- Fallback to generated artwork for files without covers
+- Consistent default album artwork for all tracks
 
 ## Screenshots
 
@@ -39,8 +38,8 @@ A modern web application for streaming videos and music with a Netflix-inspired 
 
 1. Clone the repository:
    ```
-   [git clone https://github.com/yourusername/video-player-2.git
-   cd video-player-2](https://github.com/gichinga03/video-player-2.git)
+   git clone https://github.com/yourusername/video-player-2.git
+   cd video-player-2
    ```
 
 2. Create and activate a virtual environment:
@@ -78,9 +77,9 @@ A modern web application for streaming videos and music with a Netflix-inspired 
 - Music files are read from `C:\Users\gichi\Music` by default (configurable in `server.py`)
 
 ### Album Artwork
-- Album artwork is automatically extracted from music file metadata
-- If no artwork is found, a default image is used
-- All artwork is cached in the `static/album_covers` directory
+- A single default album artwork is used for all music tracks
+- The default artwork is stored in the `static/album_covers` directory
+- No internet requests are made for album artwork
 
 ## Usage
 

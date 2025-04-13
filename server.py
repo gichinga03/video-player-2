@@ -43,6 +43,13 @@ if not os.path.exists(default_cover_path):
             print(f"Created default album cover at {default_cover_path}")
     except Exception as e:
         print(f"Error creating default album cover: {e}")
+        # Create a simple colored image as fallback
+        try:
+            img = Image.new('RGB', (300, 300), color=(29, 185, 84))  # Spotify green
+            img.save(default_cover_path, 'JPEG')
+            print(f"Created fallback default album cover at {default_cover_path}")
+        except Exception as e:
+            print(f"Error creating fallback default album cover: {e}")
 
 # Debug information
 print(f"MOVIE_FOLDER: {MOVIE_FOLDER}")
@@ -327,45 +334,8 @@ def stream(filepath):
         return str(e), 500
 
 def get_album_cover(music_file):
-    """Get album cover for a music file, either from metadata or download a default one"""
-    try:
-        # Try to get cover from metadata
-        audio = EasyID3(music_file)
-        if 'APIC:' in audio:
-            cover_data = audio['APIC:'].data
-            # Save the cover
-            cover_hash = hashlib.md5(music_file.encode()).hexdigest()
-            cover_path = os.path.join(ALBUM_COVERS_FOLDER, f"{cover_hash}.jpg")
-            
-            with open(cover_path, 'wb') as f:
-                f.write(cover_data)
-            
-            return f"album_covers/{cover_hash}.jpg"
-    except:
-        pass
-    
-    # If no cover in metadata, use a default cover based on the music file name
-    cover_hash = hashlib.md5(music_file.encode()).hexdigest()
-    cover_path = os.path.join(ALBUM_COVERS_FOLDER, f"{cover_hash}.jpg")
-    
-    # Check if we already have a cover for this file
-    if os.path.exists(cover_path):
-        return f"album_covers/{cover_hash}.jpg"
-    
-    # Download a default cover
-    try:
-        # Use a music-themed image from Unsplash
-        response = requests.get(f"https://source.unsplash.com/random/300x300/?music,album&sig={hash(music_file) % 100}")
-        if response.status_code == 200:
-            # Process and save the image
-            img = Image.open(BytesIO(response.content))
-            img = img.convert('RGB')
-            img.save(cover_path, 'JPEG', quality=85)
-            return f"album_covers/{cover_hash}.jpg"
-    except:
-        pass
-    
-    # If all else fails, return a default cover
+    """Get album cover for a music file, using only the default cover"""
+    # Always return the default cover
     return "album_covers/default.jpg"
 
 def get_music_files():
